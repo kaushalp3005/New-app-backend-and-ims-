@@ -81,3 +81,7 @@ app.include_router(ims_router)
 app.include_router(inward_router)
 app.include_router(interunit_router)
 app.include_router(transfer_router)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
