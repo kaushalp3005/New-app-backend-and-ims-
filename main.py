@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from shared.database import engine
 from shared.logger import get_logger
@@ -19,6 +21,17 @@ from services.ims_service.transfer_server import router as transfer_router
 
 logger = get_logger("main")
 
+HEALTH_URL = "https://new-app-backend-and-ims.onrender.com/health"
+
+
+def keep_alive_ping():
+    """Ping the health endpoint every 7 minutes to keep the Render server alive."""
+    try:
+        resp = httpx.get(HEALTH_URL, timeout=10)
+        logger.info("Keep-alive ping: %s %s", resp.status_code, HEALTH_URL)
+    except Exception as exc:
+        logger.warning("Keep-alive ping failed: %s", exc)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,8 +44,14 @@ async def lifespan(app: FastAPI):
         CronTrigger(hour=17, minute=30, timezone="UTC"),
         id="auto_punch_out",
     )
+    scheduler.add_job(
+        keep_alive_ping,
+        IntervalTrigger(minutes=7),
+        id="keep_alive",
+    )
     scheduler.start()
     logger.info("Scheduler started — auto punch-out at 11:00 PM IST daily")
+    logger.info("Keep-alive ping scheduled every 7 minutes")
 
     yield
 
